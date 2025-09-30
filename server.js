@@ -47,15 +47,15 @@ async function textToSpeech(text) {
             };
         }
         
-        console.log('[TTS] Generating speech with ElevenLabs SDK...');
+        console.log('[TTS] Generating Italian speech with ElevenLabs SDK...');
         console.log(`[TTS] Text: "${text.substring(0, 50)}..."`);
         
         try {
-            // Generate audio using the SDK
+            // Generate audio using the SDK with Italian voice
             const audioStream = await elevenlabs.generate({
-                voice: "Rachel", // You can use voice name or ID
+                voice: "Bella", // Italian female voice (you can also try "Giovanni" for male)
                 text: text,
-                model_id: "eleven_monolingual_v1",
+                model_id: "eleven_multilingual_v2", // IMPORTANT: Use multilingual model for Italian
                 voice_settings: {
                     stability: 0.5,
                     similarity_boost: 0.5
@@ -71,7 +71,7 @@ async function textToSpeech(text) {
             
             // Convert to base64
             const audioBase64 = audioBuffer.toString('base64');
-            console.log('[TTS] ✓ Audio generated successfully, size:', Math.round(audioBuffer.length / 1024), 'KB');
+            console.log('[TTS] ✓ Italian audio generated successfully, size:', Math.round(audioBuffer.length / 1024), 'KB');
             
             return {
                 audio: audioBase64,
@@ -290,15 +290,15 @@ async function processWithGPT(callContext, userMessage) {
             console.log('[WARNING] Running in mock mode - no actual AI');
             
             const mockResponses = [
-                "I'd be happy to help you with that! Let me check what's available.",
-                "Sure thing! I can look that up for you right away.",
-                "Absolutely! Let me find the best options for you.",
-                "Great question! Let me search for that information."
+                "Sarò felice di aiutarti! Lascia che controlli cosa è disponibile.",
+                "Certamente! Posso cercarlo subito per te.",
+                "Assolutamente! Lascia che trovi le migliori opzioni per te.",
+                "Ottima domanda! Lascia che cerchi queste informazioni."
             ];
             
             const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
-            const shouldUseTool = Math.random() > 0.5 && userMessage.toLowerCase().includes('flight');
-            const shouldEnd = userMessage.toLowerCase().includes('bye') || userMessage.toLowerCase().includes('thank');
+            const shouldUseTool = Math.random() > 0.5 && userMessage.toLowerCase().includes('volo');
+            const shouldEnd = userMessage.toLowerCase().includes('ciao') || userMessage.toLowerCase().includes('grazie') || userMessage.toLowerCase().includes('arrivederci');
             
             let finalResponse = randomResponse;
             let toolResult = null;
@@ -306,12 +306,12 @@ async function processWithGPT(callContext, userMessage) {
             
             if (shouldUseTool) {
                 toolUsed = 'checkFlightPrices';
-                toolResult = await travelAgencyTools.checkFlightPrices({ origin: 'NYC', destination: 'LAX' });
-                finalResponse = `${randomResponse} I found ${toolResult.data.flights.length} flights available. The cheapest option is ${toolResult.data.flights[0].airline} at $${toolResult.data.flights[0].price} departing at ${toolResult.data.flights[0].time}.`;
+                toolResult = await travelAgencyTools.checkFlightPrices({ origin: 'Roma', destination: 'Milano' });
+                finalResponse = `${randomResponse} Ho trovato ${toolResult.data.flights.length} voli disponibili. L'opzione più economica è ${toolResult.data.flights[0].airline} a €${toolResult.data.flights[0].price} con partenza alle ${toolResult.data.flights[0].time}.`;
             }
             
             if (shouldEnd) {
-                finalResponse = "Thank you for calling! Have a great day and safe travels!";
+                finalResponse = "Grazie per averci chiamato! Buona giornata e buon viaggio!";
             }
             
             callContext.addMessage('assistant', finalResponse);
@@ -329,34 +329,35 @@ async function processWithGPT(callContext, userMessage) {
             `Tool ${t.tool} returned: ${JSON.stringify(t.result)}`
         ).join('\n');
         
-        const systemPrompt = `You are a helpful travel agency receptionist on a phone call. Keep responses concise and natural for phone conversation.
+        const systemPrompt = `Sei un utile receptionist di un'agenzia di viaggi al telefono. Rispondi SEMPRE in italiano. Mantieni le risposte concise e naturali per una conversazione telefonica.
 
-Available tools:
-- checkFlightPrices: params {origin, destination, date}
-- checkHotelAvailability: params {location, checkIn, checkOut, guests}
-- makeBooking: params {type, details, customerInfo}
-- endCall: params {summary}
+Strumenti disponibili:
+- checkFlightPrices: parametri {origin, destination, date}
+- checkHotelAvailability: parametri {location, checkIn, checkOut, guests}
+- makeBooking: parametri {type, details, customerInfo}
+- endCall: parametri {summary}
 
-${recentToolResults ? `Recent tool results:\n${recentToolResults}\n` : ''}
+${recentToolResults ? `Risultati recenti degli strumenti:\n${recentToolResults}\n` : ''}
 
-Customer info: ${JSON.stringify(callContext.customerInfo)}
+Informazioni cliente: ${JSON.stringify(callContext.customerInfo)}
 
-IMPORTANT: 
-- Keep responses short and conversational (1-2 sentences ideal)
-- When you use a tool, incorporate its results naturally
-- Set shouldEndCall to true when the customer says goodbye or the booking is complete
+IMPORTANTE: 
+- Rispondi SEMPRE in italiano, anche se il cliente parla in inglese
+- Mantieni le risposte brevi e conversazionali (1-2 frasi ideali)
+- Quando usi uno strumento, incorpora i risultati in modo naturale
+- Imposta shouldEndCall su true quando il cliente dice arrivederci o la prenotazione è completa
 
-Respond in JSON:
+Rispondi in JSON:
 {
-    "response": "Your spoken response",
-    "tool": "toolName or null",
+    "response": "La tua risposta parlata IN ITALIANO",
+    "tool": "toolName o null",
     "toolParams": {},
     "collectInfo": {},
     "shouldEndCall": false
 }`;
 
-        console.log('[API] Calling OpenAI endpoint...');
-        console.log(`[DEBUG] Model: gpt-3.5-turbo, Temp: 0.7`);
+        console.log('[API] Calling OpenAI endpoint for Italian response...');
+        console.log(`[DEBUG] Model: gpt-3.5-turbo, Temp: 0.7, Language: Italian`);
         
         const completion = await openai.chat.completions.create({
             model: "gpt-3.5-turbo",
@@ -379,13 +380,13 @@ Respond in JSON:
             callContext.addToolResult(gptResponse.tool, toolResult);
             
             console.log('[GPT] Re-processing with tool results...');
-            const followUpPrompt = `The tool ${gptResponse.tool} returned: ${JSON.stringify(toolResult)}
+            const followUpPrompt = `Lo strumento ${gptResponse.tool} ha restituito: ${JSON.stringify(toolResult)}
             
-Now incorporate this information into a SHORT, NATURAL phone response to the customer.
+Ora incorpora queste informazioni in una risposta telefonica BREVE e NATURALE IN ITALIANO per il cliente.
 
-Respond in JSON:
+Rispondi in JSON:
 {
-    "response": "Your brief spoken response with the specific results",
+    "response": "La tua breve risposta parlata IN ITALIANO con i risultati specifici",
     "tool": null,
     "toolParams": {},
     "collectInfo": {},
@@ -638,7 +639,7 @@ app.get('/test-tts', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT,"0.0.0.0", () => {
     console.log(`[STARTUP] Call center server booting...`);
     console.log(`[SYSTEM] Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`[SERVER] Running on http://localhost:${PORT}`);
